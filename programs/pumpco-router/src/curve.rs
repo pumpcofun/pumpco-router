@@ -23,6 +23,9 @@ pub fn route<'info>(
     require!(!a.config.paused, RouterError::Paused);
     require!(a.agent_auth.enabled, RouterError::AgentDisabled);
     require_curve_open(&a.bonding_curve.to_account_info())?;
+    if a.config.restrict_mints {
+        require_mint_allowed(&a.mint_allow.to_account_info(), &a.mint.key())?;
+    }
 
     if side == Side::Buy {
         require!(ceiling > 0, RouterError::ZeroAmount);
