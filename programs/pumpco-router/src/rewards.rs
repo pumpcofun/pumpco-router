@@ -27,6 +27,7 @@ pub fn distribute<'a, 'info: 'a>(
     vault: AccountInfo<'info>,
     treasury: AccountInfo<'info>,
     payees: &'a [AccountInfo<'info>],
+    total_reward_bps: u64,
 ) -> Result<()> {
 
     // Never spend the account out of existence.
@@ -39,7 +40,7 @@ pub fn distribute<'a, 'info: 'a>(
     let mut paid: u64 = 0;
     let mut bps_total: u64 = 0;
 
-    for pair in payees.chunks(2) {
+    for (index, pair) in payees.chunks(2).enumerate() {
         let (auth_info, wallet_info) = (&pair[0], &pair[1]);
 
         // The caller chose these accounts, so prove the pairing rather than
@@ -54,6 +55,12 @@ pub fn distribute<'a, 'info: 'a>(
         require_keys_eq!(wallet, *wallet_info.key, RouterError::MalformedPayees);
         if reward_bps == 0 {
             continue;
+        }
+
+        // The caller picks this list, so refusing a repeat is the only thing
+        // stopping one agent being paid twice out of everyone else's share.
+        for earlier in payees.chunks(2).take(index) {
+            require_keys_neq!(*earlier[0].key, *auth_info.key, RouterError::DuplicatePayee);
         }
 
         bps_total = bps_total
@@ -76,6 +83,12 @@ pub fn distribute<'a, 'info: 'a>(
         move_lamports(&vault, wallet_info, cut)?;
         paid = paid.checked_add(cut).ok_or(RouterError::MathOverflow)?;
     }
+
+    // The hole this closes: the payee list is caller supplied and permissionless,
+    // so a call naming nobody used to be valid and sent the entire balance to the
+    // treasury. Demanding the shares add up to every registered agent's total
+    // means a caller either pays everyone or the instruction fails.
+    require!(bps_total == total_reward_bps, RouterError::IncompletePayees);
 
     // Whatever the agents were not entitled to, including rounding dust.
     let remainder = available.saturating_sub(paid);

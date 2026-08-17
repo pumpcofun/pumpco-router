@@ -62,6 +62,7 @@ pub mod pumpco_router {
         config.fee_bps = args.fee_bps;
         config.max_lamports_per_trade = args.max_lamports_per_trade;
         config.default_daily_limit = args.default_daily_limit;
+        config.total_reward_bps = 0;
         config.paused = false;
         config.bump = ctx.bumps.config;
         Ok(())
@@ -83,6 +84,14 @@ pub mod pumpco_router {
         Ok(())
     }
 
+    /// The authority had no rotation path: it was written once at initialize, so
+    /// losing that key froze every ceiling, the pause switch and all fee config
+    /// permanently. This is the way out.
+    pub fn set_authority(ctx: Context<SetAuthority>) -> Result<()> {
+        ctx.accounts.config.authority = ctx.accounts.new_authority.key();
+        Ok(())
+    }
+
     /// Creates the address to hand pump.fun as `creator` at token launch.
     pub fn init_creator_vault(ctx: Context<InitCreatorVault>) -> Result<()> {
         ctx.accounts.creator_vault.bump = ctx.bumps.creator_vault;
@@ -95,7 +104,9 @@ pub mod pumpco_router {
         ctx: Context<RegisterAgent>,
         daily_limit: u64,
         reward_bps: u16,
+        fee_bps: u16,
     ) -> Result<()> {
+        require!(fee_bps <= MAX_FEE_BPS, RouterError::FeeTooHigh);
         require!(
             reward_bps as u64 <= BPS_DENOMINATOR,
             RouterError::RewardSharesTooHigh
@@ -106,9 +117,20 @@ pub mod pumpco_router {
         agent.spent_today = 0;
         agent.day = guards::current_day()?;
         agent.reward_bps = reward_bps;
+        agent.fee_bps = fee_bps;
         agent.enabled = true;
         agent.authority_managed = true;
         agent.bump = ctx.bumps.agent_auth;
+
+        let config = &mut ctx.accounts.config;
+        config.total_reward_bps = config
+            .total_reward_bps
+            .checked_add(reward_bps as u64)
+            .ok_or(RouterError::MathOverflow)?;
+        require!(
+            config.total_reward_bps <= BPS_DENOMINATOR,
+            RouterError::RewardSharesTooHigh
+        );
         Ok(())
     }
 
@@ -117,12 +139,15 @@ pub mod pumpco_router {
     /// creator rewards.
     pub fn self_register(ctx: Context<SelfRegister>, daily_limit: u64) -> Result<()> {
         let cap = ctx.accounts.config.default_daily_limit;
+        let cap_fee = ctx.accounts.config.fee_bps;
         let agent = &mut ctx.accounts.agent_auth;
         agent.wallet = ctx.accounts.wallet.key();
         agent.daily_limit = if cap > 0 { daily_limit.min(cap) } else { daily_limit };
         agent.spent_today = 0;
         agent.day = guards::current_day()?;
         agent.reward_bps = 0;
+        // Outsiders pay whatever config says; only the authority can discount.
+        agent.fee_bps = cap_fee;
         agent.enabled = true;
         agent.authority_managed = false;
         agent.bump = ctx.bumps.agent_auth;
@@ -134,15 +159,31 @@ pub mod pumpco_router {
         enabled: bool,
         daily_limit: u64,
         reward_bps: u16,
+        fee_bps: u16,
     ) -> Result<()> {
+        require!(fee_bps <= MAX_FEE_BPS, RouterError::FeeTooHigh);
         require!(
             reward_bps as u64 <= BPS_DENOMINATOR,
             RouterError::RewardSharesTooHigh
         );
+        let previous = ctx.accounts.agent_auth.reward_bps as u64;
         let agent = &mut ctx.accounts.agent_auth;
         agent.enabled = enabled;
         agent.daily_limit = daily_limit;
         agent.reward_bps = reward_bps;
+        agent.fee_bps = fee_bps;
+
+        let config = &mut ctx.accounts.config;
+        config.total_reward_bps = config
+            .total_reward_bps
+            .checked_sub(previous)
+            .ok_or(RouterError::MathOverflow)?
+            .checked_add(reward_bps as u64)
+            .ok_or(RouterError::MathOverflow)?;
+        require!(
+            config.total_reward_bps <= BPS_DENOMINATOR,
+            RouterError::RewardSharesTooHigh
+        );
         Ok(())
     }
 
@@ -229,6 +270,7 @@ pub mod pumpco_router {
             ctx.accounts.creator_vault.to_account_info(),
             ctx.accounts.treasury.to_account_info(),
             ctx.remaining_accounts,
+            ctx.accounts.config.total_reward_bps,
         )
     }
 }
@@ -270,6 +312,7 @@ pub struct UpdateConfig<'info> {
 #[derive(Accounts)]
 pub struct RegisterAgent<'info> {
     #[account(
+        mut,
         seeds = [b"config"],
         bump = config.bump,
         has_one = authority @ RouterError::Unauthorized
@@ -318,6 +361,7 @@ pub struct SelfRegister<'info> {
 #[derive(Accounts)]
 pub struct SetAgent<'info> {
     #[account(
+        mut,
         seeds = [b"config"],
         bump = config.bump,
         has_one = authority @ RouterError::Unauthorized
@@ -328,6 +372,22 @@ pub struct SetAgent<'info> {
 
     #[account(mut, seeds = [b"agent", agent_auth.wallet.as_ref()], bump = agent_auth.bump)]
     pub agent_auth: Account<'info, AgentAuth>,
+}
+
+#[derive(Accounts)]
+pub struct SetAuthority<'info> {
+    #[account(
+        mut,
+        seeds = [b"config"],
+        bump = config.bump,
+        has_one = authority @ RouterError::Unauthorized
+    )]
+    pub config: Account<'info, Config>,
+
+    pub authority: Signer<'info>,
+
+    /// CHECK: only its address is stored. Hand this to a multisig when you have one.
+    pub new_authority: UncheckedAccount<'info>,
 }
 
 #[derive(Accounts)]

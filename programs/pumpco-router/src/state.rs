@@ -56,12 +56,16 @@ pub struct Config {
     pub fee_bps: u16,
     pub max_lamports_per_trade: u64,
     pub default_daily_limit: u64,
+    /// Sum of every registered agent's reward_bps. `distribute_rewards` demands
+    /// the payee list add up to exactly this, so a caller cannot omit an agent
+    /// and quietly send its share to the treasury instead.
+    pub total_reward_bps: u64,
     pub paused: bool,
     pub bump: u8,
 }
 
 impl Config {
-    pub const LEN: usize = 8 + 32 + 32 + 32 + 2 + 8 + 8 + 1 + 1;
+    pub const LEN: usize = 8 + 32 + 32 + 32 + 2 + 8 + 8 + 8 + 1 + 1;
 }
 
 #[account]
@@ -72,6 +76,10 @@ pub struct AgentAuth {
     pub day: i64,
     /// Share of swept creator rewards, in basis points.
     pub reward_bps: u16,
+    /// Overrides `config.fee_bps` for this agent. Our own machines trade at 0,
+    /// so the router fee stops being a transfer between our own pockets and
+    /// becomes real revenue only when an outsider trades.
+    pub fee_bps: u16,
     pub enabled: bool,
     /// True for the company's own machines: they cannot raise their own limits.
     /// False for wallets that registered themselves, who are spending their own
@@ -81,7 +89,7 @@ pub struct AgentAuth {
 }
 
 impl AgentAuth {
-    pub const LEN: usize = 8 + 32 + 8 + 8 + 8 + 2 + 1 + 1 + 1;
+    pub const LEN: usize = 8 + 32 + 8 + 8 + 8 + 2 + 2 + 1 + 1 + 1;
 }
 
 #[event]
@@ -137,6 +145,10 @@ pub enum RouterError {
     NothingToDistribute,
     #[msg("token account data is malformed")]
     BadTokenAccount,
+    #[msg("payee shares must equal every registered agent's total")]
+    IncompletePayees,
+    #[msg("the same agent appears twice in the payee list")]
+    DuplicatePayee,
     #[msg("arithmetic overflow")]
     MathOverflow,
 }

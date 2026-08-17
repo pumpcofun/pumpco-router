@@ -17,7 +17,9 @@ pub fn route<'info>(
     side: Side,
     data: Vec<u8>,
 ) -> Result<()> {
-    let fee_bps = a.config.fee_bps;
+    // The agent's own rate, so our machines can trade at zero while
+    // outsiders pay. Falls back to nothing special: it is set at registration.
+    let fee_bps = a.agent_auth.fee_bps;
     let max_per_trade = a.config.max_lamports_per_trade;
 
     require!(!a.config.paused, RouterError::Paused);
