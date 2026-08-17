@@ -30,6 +30,23 @@ use crate::state::*;
 
 
 
+/// Read straight off the deployed binary by explorers and by anyone auditing
+/// the program. Only compiled into the on-chain artifact, never into a CPI
+/// dependency, so a program importing this one does not inherit our contacts.
+#[cfg(not(feature = "no-entrypoint"))]
+use solana_security_txt::security_txt;
+
+#[cfg(not(feature = "no-entrypoint"))]
+security_txt! {
+    name: "pumpco",
+    project_url: "https://www.pumpco.fun",
+    contacts: "email:security@pumpco.fun,link:https://www.pumpco.fun",
+    policy: "https://github.com/pumpcofun/pumpco-router/blob/master/SECURITY.md",
+    preferred_languages: "en",
+    source_code: "https://github.com/pumpcofun/pumpco-router",
+    auditors: "None"
+}
+
 declare_id!("pumpcoEZJNNneH9KjrpBSVCKpADVgJpBbtkGvbtFbuy");
 
 #[program]

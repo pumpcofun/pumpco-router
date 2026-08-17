@@ -1,7 +1,8 @@
 // The clerk's first real trade, routed through the pumpco router on mainnet.
 // Simulates first and refuses to send unless the simulation succeeds.
 //
-// Usage: node scripts/trade-mainnet.js <mint> <sol-to-spend> [--send]
+// Usage: node scripts/trade-mainnet.js buy  <mint> <sol-to-spend> [--send]
+//        node scripts/trade-mainnet.js sell <mint> [--send]
 require("dotenv").config({ path: __dirname + "/../.env", quiet: true });
 const {
   Connection, Keypair, PublicKey, SystemProgram, Transaction,
@@ -63,8 +64,9 @@ async function readPool(pool) {
 }
 
 async function main() {
-  const mint = pk(process.argv[2]);
-  const spendSol = parseFloat(process.argv[3] || "0.005");
+  const side = process.argv[2] === "sell" ? "sell" : "buy";
+  const mint = pk(process.argv[3]);
+  const spendSol = parseFloat(process.argv[4]) || 0.005;
   const doSend = process.argv.includes("--send");
   if (!RPC) throw new Error("SOLANA_RPC_URL not set");
 
@@ -148,6 +150,14 @@ async function main() {
     m(poolV2), m(buyback), m(buybackAta, false, true),
   ];
 
+  // A sell carries five trailing accounts where a buy carries three, and the
+  // first two are the volume accumulator and its own WSOL account. Taken from a
+  // live mainnet sell rather than derived, because the shape is undocumented.
+  // A sell takes the same three trailing accounts as a buy, in the same order.
+  // pool_v2 does not exist on chain for most pools and is passed regardless;
+  // what fails is putting it anywhere other than first.
+  const sellTrailing = [m(poolV2), m(buyback), m(buybackAta, false, true)];
+
   const ixs = [
     ComputeBudgetProgram.setComputeUnitLimit({ units: 300_000 }),
     ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 300_000 }),
@@ -163,6 +173,20 @@ async function main() {
     }));
   }
 
+  if (side === "sell") {
+    const held = BigInt((await rpc("getTokenAccountBalance", [userBase.toBase58()])).value.amount);
+    if (held === 0n) throw new Error("nothing held to sell");
+    console.log("selling     :", (Number(held) / 1e6).toFixed(6), "tokens");
+    ixs.push(
+      createAssociatedTokenAccountIdempotentInstruction(clerk.publicKey, userQuote, clerk.publicKey, WSOL, TOKEN_PROGRAM_ID),
+      new TransactionInstruction({
+        programId: ROUTER,
+        keys: accounts.slice(0, 26).concat(sellTrailing),
+        data: Buffer.concat([disc("sell_amm"), u64(held), u64(0)]),
+      }),
+      createCloseAccountInstruction(userQuote, clerk.publicKey, clerk.publicKey, [], TOKEN_PROGRAM_ID)
+    );
+  } else {
   ixs.push(
     createAssociatedTokenAccountIdempotentInstruction(clerk.publicKey, userBase, clerk.publicKey, mint, baseProgram),
     createAssociatedTokenAccountIdempotentInstruction(clerk.publicKey, userQuote, clerk.publicKey, WSOL, TOKEN_PROGRAM_ID),
@@ -175,6 +199,7 @@ async function main() {
     // Returns unspent slippage and the account rent as native SOL.
     createCloseAccountInstruction(userQuote, clerk.publicKey, clerk.publicKey, [], TOKEN_PROGRAM_ID)
   );
+  }
 
   const tx = new Transaction().add(...ixs);
   tx.feePayer = clerk.publicKey;
