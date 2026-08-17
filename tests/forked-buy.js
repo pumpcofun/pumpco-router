@@ -55,6 +55,8 @@ async function main() {
   const agent = Keypair.fromSecretKey(
     Uint8Array.from(JSON.parse(fs.readFileSync(process.env.AGENT_KEY, "utf8"))));
   const feeVault = Keypair.generate();
+  // Nothing here distributes creator rewards, but initialize still records one.
+  const treasury = Keypair.generate();
 
   // The validator pre-funds the CLI default keypair; airdrops are rate limited.
   const funder = Keypair.fromSecretKey(Uint8Array.from(
@@ -84,15 +86,18 @@ async function main() {
   await send(connection, [new TransactionInstruction({
     programId: ROUTER,
     keys: [m(config, false, true), m(authority.publicKey, true, true),
-           m(feeVault.publicKey), m(SystemProgram.programId)],
-    data: Buffer.concat([disc("initialize"), u16(100), u64(LAMPORTS_PER_SOL)]),
+           m(feeVault.publicKey), m(treasury.publicKey), m(SystemProgram.programId)],
+    data: Buffer.concat([disc("initialize"), u16(100), u64(LAMPORTS_PER_SOL), u64(5 * LAMPORTS_PER_SOL)]),
   })], [authority], "initialize (1% fee, 1 SOL per-trade cap)");
 
   await send(connection, [new TransactionInstruction({
     programId: ROUTER,
-    keys: [m(config), m(authority.publicKey, true, true), m(agent.publicKey),
+    // config is writable: registering an agent adds to its total_reward_bps.
+    keys: [m(config, false, true), m(authority.publicKey, true, true), m(agent.publicKey),
            m(agentAuth, false, true), m(SystemProgram.programId)],
-    data: Buffer.concat([disc("register_agent"), u64(0.6 * LAMPORTS_PER_SOL)]),
+    // No reward share, billed at the config rate, which is what the fee
+    // assertions below expect.
+    data: Buffer.concat([disc("register_agent"), u64(0.6 * LAMPORTS_PER_SOL), u16(0), u16(100)]),
   })], [authority], "register_agent (0.6 SOL daily budget)");
 
   // Idempotent ATA create (instruction 1).

@@ -260,6 +260,18 @@ pub mod pumpco_router {
         amm::route(&mut ctx.accounts, ctx.remaining_accounts, 0, Side::Sell, data)
     }
 
+    /// Permissionless, like the collect instructions it follows. Turns wrapped
+    /// SOL sitting in the vault's token account into lamports the vault holds
+    /// directly, which is the only form `distribute_rewards` can move.
+    pub fn unwrap_creator_fees(ctx: Context<UnwrapCreatorFees>) -> Result<()> {
+        rewards::unwrap(
+            ctx.accounts.wsol_account.to_account_info(),
+            ctx.accounts.creator_vault.to_account_info(),
+            ctx.accounts.token_program.to_account_info(),
+            ctx.accounts.creator_vault.bump,
+        )
+    }
+
     /// Permissionless. Pair this with pump.fun's `collect_creator_fee`, which
     /// also needs no signature, and the whole reward path runs without a key.
     pub fn distribute_rewards<'info>(
@@ -564,4 +576,24 @@ pub struct Distribute<'info> {
     /// CHECK: pinned to the configured treasury.
     pub treasury: UncheckedAccount<'info>,
     // remaining_accounts: (agent_auth, wallet) pairs, in any order.
+}
+
+#[derive(Accounts)]
+pub struct UnwrapCreatorFees<'info> {
+    #[account(seeds = [b"config"], bump = config.bump)]
+    pub config: Account<'info, Config>,
+
+    /// Signs the close with its own seeds, and is the only permitted destination.
+    #[account(mut, seeds = [b"creator"], bump = creator_vault.bump)]
+    pub creator_vault: Account<'info, CreatorVault>,
+
+    #[account(mut)]
+    /// CHECK: must be a wrapped SOL account owned by the vault. SPL Token
+    /// enforces that, since the vault is passed as the close authority.
+    pub wsol_account: UncheckedAccount<'info>,
+
+    /// CHECK: pinned. Left unpinned, a caller could name any program here and
+    /// have the creator PDA sign for it.
+    #[account(address = TOKEN_PROGRAM @ RouterError::WrongProgram)]
+    pub token_program: UncheckedAccount<'info>,
 }

@@ -239,6 +239,79 @@ async function main() {
     data: disc("distribute_rewards"),
   })], [outsider], "payout redirected to a different wallet", "MalformedPayees");
 
+  // --- unwrapping creator fees that arrived as wrapped SOL -----------------
+  // After a mint graduates, pump.fun pays creator fees into a token account
+  // rather than as lamports, and distribute_rewards can only move lamports.
+  console.log("\nunwrapping wrapped SOL:");
+
+  const TOKEN_PROGRAM = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
+  const WSOL = new PublicKey("So11111111111111111111111111111111111111112");
+  const WRAPPED = 0.3 * LAMPORTS_PER_SOL;
+
+  const wsolAccount = Keypair.generate();
+  const tokenRent = await connection.getMinimumBalanceForRentExemption(165);
+  await sendAndConfirmTransaction(connection, new Transaction().add(
+    SystemProgram.createAccount({
+      fromPubkey: funder.publicKey,
+      newAccountPubkey: wsolAccount.publicKey,
+      lamports: tokenRent + WRAPPED,
+      space: 165,
+      programId: TOKEN_PROGRAM,
+    }),
+    // InitializeAccount3, so the owner is an argument and no rent sysvar is needed.
+    new TransactionInstruction({
+      programId: TOKEN_PROGRAM,
+      keys: [m(wsolAccount.publicKey, false, true), m(WSOL)],
+      data: Buffer.concat([Buffer.from([18]), creatorVault.toBuffer()]),
+    }),
+    // SyncNative, which is what turns the bare lamports into a wSOL balance.
+    new TransactionInstruction({
+      programId: TOKEN_PROGRAM,
+      keys: [m(wsolAccount.publicKey, false, true)],
+      data: Buffer.from([17]),
+    }),
+  ), [funder, wsolAccount], { commitment: "confirmed" });
+  ok(`${WRAPPED / LAMPORTS_PER_SOL} wSOL parked in an account the vault owns`);
+
+  const vaultBefore = await connection.getBalance(creatorVault);
+  const unwrapKeys = (tokenProgram) => [
+    m(config), m(creatorVault, false, true),
+    m(wsolAccount.publicKey, false, true), m(tokenProgram),
+  ];
+
+  // A fake token program here would be invoked with the creator PDA signing.
+  await expectFail(connection, [new TransactionInstruction({
+    programId: ROUTER,
+    keys: unwrapKeys(outsider.publicKey),
+    data: disc("unwrap_creator_fees"),
+  })], [outsider], "unwrap through an impostor token program", "WrongProgram");
+
+  // Permissionless on purpose: an outsider signs, and the value can only move
+  // into the vault.
+  await expectOk(connection, [new TransactionInstruction({
+    programId: ROUTER,
+    keys: unwrapKeys(TOKEN_PROGRAM),
+    data: disc("unwrap_creator_fees"),
+  })], [outsider], "an outsider unwrapped the vault's wSOL");
+
+  const vaultAfter = await connection.getBalance(creatorVault);
+  const gained = vaultAfter - vaultBefore;
+  if (gained === WRAPPED + tokenRent) ok("  balance and rent both landed in the vault");
+  else bad("unwrap amount", `expected ${WRAPPED + tokenRent}, got ${gained}`);
+  if ((await connection.getAccountInfo(wsolAccount.publicKey)) === null) ok("  the token account is gone");
+  else bad("close", "the wSOL account still exists");
+
+  // The point of the whole instruction: distribute can now reach that money.
+  await expectOk(connection, [new TransactionInstruction({
+    programId: ROUTER,
+    keys: [
+      m(config), m(creatorVault, false, true), m(treasury.publicKey, false, true),
+      m(authOf(agentA.publicKey), false, true), m(agentA.publicKey, false, true),
+      m(authOf(agentB.publicKey), false, true), m(agentB.publicKey, false, true),
+    ],
+    data: disc("distribute_rewards"),
+  })], [outsider], "  graduated fees then distributed normally");
+
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);
 }

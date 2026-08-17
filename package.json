@@ -7,7 +7,9 @@
     "test": "tests"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node signer/policy.test.js",
+    "test:local": "node tests/admin-and-rewards.js",
+    "test:forked": "node tests/forked-buy.js && node tests/forked-amm.js"
   },
   "keywords": [],
   "author": "",

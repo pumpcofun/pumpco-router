@@ -9,6 +9,10 @@
 //! change where it goes.
 
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::{
+    instruction::{AccountMeta, Instruction},
+    program::invoke_signed,
+};
 
 use crate::state::*;
 
@@ -102,6 +106,39 @@ pub fn distribute<'a, 'info: 'a>(
         to_treasury: remainder,
         timestamp: Clock::get()?.unix_timestamp,
     });
+    Ok(())
+}
+
+/// SPL Token's CloseAccount. On a wrapped SOL account this is the unwrap: the
+/// balance and the rent both leave as lamports to the destination.
+const CLOSE_ACCOUNT: u8 = 9;
+
+/// Creator fees arrive as native SOL on the bonding curve but as wrapped SOL in
+/// a token account once a mint graduates, and `distribute` only moves lamports.
+/// Without this, everything earned after graduation would sit in a token account
+/// the program could see and never spend.
+///
+/// The vault owns that token account, so only the program can sign this, and the
+/// proceeds can only land in the vault itself.
+pub fn unwrap<'info>(
+    wsol_account: AccountInfo<'info>,
+    vault: AccountInfo<'info>,
+    token_program: AccountInfo<'info>,
+    bump: u8,
+) -> Result<()> {
+    invoke_signed(
+        &Instruction {
+            program_id: *token_program.key,
+            accounts: vec![
+                AccountMeta::new(*wsol_account.key, false),
+                AccountMeta::new(*vault.key, false),
+                AccountMeta::new_readonly(*vault.key, true),
+            ],
+            data: vec![CLOSE_ACCOUNT],
+        },
+        &[wsol_account, vault.clone(), vault, token_program],
+        &[&[b"creator", &[bump]]],
+    )?;
     Ok(())
 }
 

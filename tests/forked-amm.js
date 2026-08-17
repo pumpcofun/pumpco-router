@@ -107,9 +107,10 @@ async function main() {
 
   await send(connection, [new TransactionInstruction({
     programId: ROUTER,
-    keys: [m(config), m(authority.publicKey, true, true), m(agent.publicKey),
+    // config is writable: registering an agent adds to its total_reward_bps.
+    keys: [m(config, false, true), m(authority.publicKey, true, true), m(agent.publicKey),
            m(agentAuth, false, true), m(SystemProgram.programId)],
-    data: Buffer.concat([disc("register_agent"), u64(5 * LAMPORTS_PER_SOL), u16(0)]),
+    data: Buffer.concat([disc("register_agent"), u64(5 * LAMPORTS_PER_SOL), u16(0), u16(100)]),
   })], [authority], "register_agent");
 
   // PumpSwap tracks per-user volume in a PDA that must already exist.
