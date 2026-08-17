@@ -177,11 +177,16 @@ pub mod pumpco_router {
         max_quote_amount_in: u64,
         track_volume: Option<bool>,
     ) -> Result<()> {
-        let mut data = Vec::with_capacity(26);
+        let mut data = Vec::with_capacity(25);
         data.extend_from_slice(&BUY_DISCRIMINATOR);
         data.extend_from_slice(&base_amount_out.to_le_bytes());
         data.extend_from_slice(&max_quote_amount_in.to_le_bytes());
-        track_volume.serialize(&mut data)?;
+        // Real mainnet buys omit this argument entirely, giving a 24 byte
+        // payload, and pump.fun tolerates the short buffer. `None` reproduces
+        // that verified shape; `Some` appends the one byte the IDL describes.
+        if let Some(track) = track_volume {
+            data.push(track as u8);
+        }
         amm::route(&mut ctx.accounts, ctx.remaining_accounts, max_quote_amount_in, Side::Buy, data)
     }
 
