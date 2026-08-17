@@ -153,6 +153,10 @@ pub enum RouterError {
     IncompletePayees,
     #[msg("the same agent appears twice in the payee list")]
     DuplicatePayee,
+    #[msg("this account is already at the current layout")]
+    AlreadyMigrated,
+    #[msg("account would not be rent exempt at its new length; send it lamports first")]
+    NotRentExempt,
     #[msg("arithmetic overflow")]
     MathOverflow,
 }
