@@ -70,7 +70,7 @@ async function send(connection, ixs, signers, label) {
 async function main() {
   const connection = new Connection(RPC, "confirmed");
   const funder = Keypair.fromSecretKey(Uint8Array.from(
-    JSON.parse(fs.readFileSync("C:/Users/offic/.config/solana/id.json", "utf8"))));
+    JSON.parse(fs.readFileSync(process.env.FUNDER_KEY || require("os").homedir() + "/.config/solana/id.json", "utf8"))));
   const authority = Keypair.generate();
   const agent = Keypair.fromSecretKey(Uint8Array.from(
     JSON.parse(fs.readFileSync(process.env.AGENT_KEY, "utf8"))));

@@ -2,7 +2,7 @@
 # Local validator carrying pump.fun's bonding curve AND PumpSwap, with a real
 # graduated pool cloned from mainnet, so both venues can be exercised against
 # the actual programs rather than a mock.
-SP="C:/Users/offic/AppData/Local/Temp/claude/C--Users-offic-Projects-awaken/45bd37e7-d269-45b0-9ec0-7111c4e97b3d/scratchpad"
+SP="${LEDGER_DIR:-./.localnet}"
 RPC="${MAINNET_RPC:-https://api.mainnet-beta.solana.com}"
 
 exec solana-test-validator --reset --quiet \
@@ -24,4 +24,4 @@ exec solana-test-validator --reset --quiet \
   --maybe-clone BdJ7Nc4G2vxr7R1QgMJq3Frg4BdG27MDfFuzAB7jVc6o \
   --maybe-clone A7hAgCzFw14fejgCp387JUJRMNyz4j89JKnhtKU8piqW \
   --bpf-program pumpcoEZJNNneH9KjrpBSVCKpADVgJpBbtkGvbtFbuy \
-    /c/Users/offic/Projects/pumpco-router/target/deploy/pumpco_router.so
+    "${PROGRAM_SO:-./target/deploy/pumpco_router.so}"

@@ -58,7 +58,7 @@ async function main() {
 
   // The validator pre-funds the CLI default keypair; airdrops are rate limited.
   const funder = Keypair.fromSecretKey(Uint8Array.from(
-    JSON.parse(fs.readFileSync("C:/Users/offic/.config/solana/id.json", "utf8"))));
+    JSON.parse(fs.readFileSync(process.env.FUNDER_KEY || require("os").homedir() + "/.config/solana/id.json", "utf8"))));
   await sendAndConfirmTransaction(connection, new Transaction().add(
     ...[authority.publicKey, agent.publicKey].map((to) =>
       SystemProgram.transfer({ fromPubkey: funder.publicKey, toPubkey: to, lamports: 20 * LAMPORTS_PER_SOL })),

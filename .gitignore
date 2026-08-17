@@ -10,3 +10,8 @@ test-ledger
 *.json.key
 keys/
 *-keypair.json
+
+# local machine config: rpc keys, keypair paths
+.env
+.env.local
+.localnet/
