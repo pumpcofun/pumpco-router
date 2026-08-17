@@ -107,18 +107,28 @@ trades, then two admin and rewards exercises.
   `distribute_rewards` has never moved a creator fee on mainnet, because no token
   names the creator PDA, so the vault holds exactly its rent and the instruction
   aborts with `NothingToDistribute`.
-- Two properties of `distribute_rewards` are untested and undesigned rather than
-  verified: a call with zero payees satisfies the `% 2 == 0` check and sends the
-  whole available balance to the treasury, and the payee loop has no seen-set, so
-  a repeated pair is paid again up to the cumulative 100% cap. Neither is theft,
-  since the treasury is pinned to config, but both mean `reward_bps` describes
-  what a cooperative caller pays rather than what the instruction enforces.
+- **`unwrap_creator_fees` has never run on mainnet.** It is covered locally, but
+  no token names the creator PDA yet, so no wrapped SOL has ever reached the
+  vault to unwrap.
 - **The deployed binary has not been verified against source.** No reproducible
   build was run, so whether the mainnet artifact matches any commit in this repo
   is unknown.
-- `npm test` is still the placeholder that exits 1, so `signer/policy.test.js`
-  runs only when invoked by hand.
 - No human other than the author has read this.
+
+## The outage of 2026-08-17
+
+`Config` and `AgentAuth` each gained a field, both inserted mid-struct rather
+than appended. The accounts on mainnet predated the change, so the upgraded
+program could not deserialize them and every instruction failed for 37 minutes,
+until a `migrate` instruction grew both records and shifted their tails.
+
+Nothing could be lost, because nothing could execute.
+
+Every suite passed throughout. All of them create their accounts fresh with the
+program under test, so none could see a record written by an older build.
+`tests/migration.js` now closes that gap by deploying the previous program,
+writing real records with it, upgrading, and migrating. Run it for any future
+change to an on-chain struct, and prefer appending fields to inserting them.
 
 ## Operational requirements that are easy to miss
 
@@ -128,11 +138,8 @@ trades, then two admin and rewards exercises.
 - **Upgrade authority is a single key.** For a program routing other people's
   money that is the first thing anyone will ask about. Move it to a multisig or
   decide deliberately not to.
-- **`config.authority` has no rotation path.** It is written once in
-  `initialize` and no instruction ever changes it. Losing that key permanently
-  freezes agent registration, every agent limit, the pause switch and all fee
-  configuration, recoverable only by a program upgrade, which needs the upgrade
-  authority as well. Both keys are currently the same wallet.
+- **`config.authority` can now be rotated** with `set_authority`, but it and the
+  upgrade authority are still the same wallet, so one key loss still costs both.
 - **The fee vault and the treasury are currently the same account**, so router
   trading fees and any undistributed creator rewards commingle with no way to
   tell them apart after the fact.
