@@ -45,7 +45,6 @@ pub mod pumpco_router {
         config.fee_bps = args.fee_bps;
         config.max_lamports_per_trade = args.max_lamports_per_trade;
         config.default_daily_limit = args.default_daily_limit;
-        config.restrict_mints = args.restrict_mints;
         config.paused = false;
         config.bump = ctx.bumps.config;
         Ok(())
@@ -59,30 +58,11 @@ pub mod pumpco_router {
         config.fee_bps = args.fee_bps;
         config.max_lamports_per_trade = args.max_lamports_per_trade;
         config.default_daily_limit = args.default_daily_limit;
-        config.restrict_mints = args.restrict_mints;
         Ok(())
     }
 
     pub fn set_paused(ctx: Context<UpdateConfig>, paused: bool) -> Result<()> {
         ctx.accounts.config.paused = paused;
-        Ok(())
-    }
-
-    /// Flip the allowlist on or off without touching anything else.
-    pub fn set_restrict_mints(ctx: Context<UpdateConfig>, restrict: bool) -> Result<()> {
-        ctx.accounts.config.restrict_mints = restrict;
-        Ok(())
-    }
-
-    pub fn allow_mint(ctx: Context<AllowMint>) -> Result<()> {
-        let allow = &mut ctx.accounts.mint_allow;
-        allow.mint = ctx.accounts.mint.key();
-        allow.bump = ctx.bumps.mint_allow;
-        Ok(())
-    }
-
-    /// Closes the allow account and returns its rent to the authority.
-    pub fn revoke_mint(_ctx: Context<RevokeMint>) -> Result<()> {
         Ok(())
     }
 
@@ -329,54 +309,6 @@ pub struct SetAgent<'info> {
 }
 
 #[derive(Accounts)]
-pub struct AllowMint<'info> {
-    #[account(
-        seeds = [b"config"],
-        bump = config.bump,
-        has_one = authority @ RouterError::Unauthorized
-    )]
-    pub config: Account<'info, Config>,
-
-    #[account(mut)]
-    pub authority: Signer<'info>,
-
-    /// CHECK: only its address is stored.
-    pub mint: UncheckedAccount<'info>,
-
-    #[account(
-        init,
-        payer = authority,
-        space = MintAllow::LEN,
-        seeds = [b"mint", mint.key().as_ref()],
-        bump
-    )]
-    pub mint_allow: Account<'info, MintAllow>,
-
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
-pub struct RevokeMint<'info> {
-    #[account(
-        seeds = [b"config"],
-        bump = config.bump,
-        has_one = authority @ RouterError::Unauthorized
-    )]
-    pub config: Account<'info, Config>,
-
-    #[account(mut)]
-    pub authority: Signer<'info>,
-
-    #[account(
-        mut,
-        close = authority,
-        seeds = [b"mint", mint_allow.mint.as_ref()],
-        bump = mint_allow.bump
-    )]
-    pub mint_allow: Account<'info, MintAllow>,
-}
-
-#[derive(Accounts)]
 pub struct SetOwnLimit<'info> {
     pub wallet: Signer<'info>,
 
@@ -403,10 +335,6 @@ pub struct TradeCurve<'info> {
     #[account(address = PUMP_PROGRAM @ RouterError::WrongProgram)]
     /// CHECK: pinned; this is the CPI target.
     pub pump_program: UncheckedAccount<'info>,
-
-    /// CHECK: ignored unless `restrict_mints` is on, then fully verified in
-    /// `require_mint_allowed`. Pass the program id as a placeholder when off.
-    pub mint_allow: UncheckedAccount<'info>,
 
     // Forwarded untouched. pump.fun validates its own PDAs with its own seeds,
     // so re-deriving them here would add surface area, not a guarantee.
@@ -464,10 +392,6 @@ pub struct TradeAmm<'info> {
     #[account(address = PUMP_AMM_PROGRAM @ RouterError::WrongProgram)]
     /// CHECK: pinned; this is the CPI target.
     pub amm_program: UncheckedAccount<'info>,
-
-    /// CHECK: ignored unless `restrict_mints` is on, then fully verified in
-    /// `require_mint_allowed`. Pass the program id as a placeholder when off.
-    pub mint_allow: UncheckedAccount<'info>,
 
     #[account(mut)]
     /// CHECK: validated by PumpSwap.

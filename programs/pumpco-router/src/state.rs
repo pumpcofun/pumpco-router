@@ -20,6 +20,12 @@ pub const SECONDS_PER_DAY: i64 = 86_400;
 pub const TOKEN_AMOUNT_OFFSET: usize = 64;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Venue {
+    Curve,
+    Amm,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Side {
     Buy,
     Sell,
@@ -31,7 +37,6 @@ pub struct ConfigArgs {
     pub max_lamports_per_trade: u64,
     /// Ceiling applied to anyone who registers themselves.
     pub default_daily_limit: u64,
-    pub restrict_mints: bool,
 }
 
 impl ConfigArgs {
@@ -52,27 +57,11 @@ pub struct Config {
     pub max_lamports_per_trade: u64,
     pub default_daily_limit: u64,
     pub paused: bool,
-    /// Off by default. The clerk is meant to find its own tokens, so the daily
-    /// budget is the bound. Turn this on and the allowlist becomes the bound
-    /// instead, without needing a redeploy.
-    pub restrict_mints: bool,
     pub bump: u8,
 }
 
 impl Config {
-    pub const LEN: usize = 8 + 32 + 32 + 32 + 2 + 8 + 8 + 1 + 1 + 1;
-}
-
-/// One of these existing is what makes a mint tradeable while `restrict_mints`
-/// is on. Authority creates and closes them; a trade only ever reads.
-#[account]
-pub struct MintAllow {
-    pub mint: Pubkey,
-    pub bump: u8,
-}
-
-impl MintAllow {
-    pub const LEN: usize = 8 + 32 + 1;
+    pub const LEN: usize = 8 + 32 + 32 + 32 + 2 + 8 + 8 + 1 + 1;
 }
 
 #[account]
@@ -148,8 +137,6 @@ pub enum RouterError {
     NothingToDistribute,
     #[msg("token account data is malformed")]
     BadTokenAccount,
-    #[msg("this mint is not on the allowlist")]
-    MintNotAllowed,
     #[msg("arithmetic overflow")]
     MathOverflow,
 }

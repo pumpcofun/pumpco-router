@@ -69,24 +69,6 @@ pub fn token_amount(account: &AccountInfo) -> Result<u64> {
     Ok(u64::from_le_bytes(buf))
 }
 
-/// Only consulted while `restrict_mints` is on. Verifies the caller handed us
-/// the real allow account for this exact mint rather than any account at all:
-/// right PDA, owned by us, right discriminator, and the mint it stores matches.
-pub fn require_mint_allowed(allow: &AccountInfo, mint: &Pubkey) -> Result<()> {
-    let (expected, _) = Pubkey::find_program_address(&[b"mint", mint.as_ref()], &crate::ID);
-    require_keys_eq!(*allow.key, expected, RouterError::MintNotAllowed);
-    require_keys_eq!(*allow.owner, crate::ID, RouterError::MintNotAllowed);
-
-    let data = allow.try_borrow_data()?;
-    require!(data.len() >= 40, RouterError::MintNotAllowed);
-    require!(
-        data[..8] == MintAllow::DISCRIMINATOR[..],
-        RouterError::MintNotAllowed
-    );
-    require!(&data[8..40] == mint.as_ref(), RouterError::MintNotAllowed);
-    Ok(())
-}
-
 /// `complete` sits after the five u64 reserve fields on pump.fun's BondingCurve.
 /// Refusing a graduated curve here fails loudly instead of reverting somewhere
 /// deep inside pump.fun with an error nobody can read.
