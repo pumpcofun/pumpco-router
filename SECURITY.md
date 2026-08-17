@@ -45,6 +45,31 @@ Two further limits on what this program can promise:
   agent's ceiling, disable it, or grant it a reward share, including a wallet that
   registered itself. The flag only stops a wallet raising its own ceiling.
 
+## Verified against source
+
+The deployed binary is a reproducible build of commit `09a5f60`, confirmed by
+OtterSec's remote verifier as well as locally.
+
+| | |
+|---|---|
+| Program hash | `55ea548749fa7ce8440049e7803c6a9805324db84aecf4dd6a095cb0cbf77929` |
+| Status | https://verify.osec.io/status/pumpcoEZJNNneH9KjrpBSVCKpADVgJpBbtkGvbtFbuy |
+
+To reproduce, which needs Docker and nothing from this machine:
+
+```
+solana-verify build --library-name pumpco_router   -b solanafoundation/solana-verifiable-build:4.0.3
+solana-verify get-program-hash -u <rpc> pumpcoEZJNNneH9KjrpBSVCKpADVgJpBbtkGvbtFbuy
+```
+
+The image tag matters. Older images ship a cargo that cannot parse the
+`edition2024` manifests in the dependency tree, and every image produces a
+binary about 29 KB larger than a local `cargo build-sbf`, which is why the
+program account had to be extended before this could be deployed.
+
+This proves the bytes on chain are the source in this repo. It says nothing
+about whether the source is correct.
+
 ## Static analysis
 
 `program_autofixer` from the Solana Foundation MCP (`https://mcp.solana.com/mcp`,
@@ -110,9 +135,6 @@ trades, then two admin and rewards exercises.
 - **`unwrap_creator_fees` has never run on mainnet.** It is covered locally, but
   no token names the creator PDA yet, so no wrapped SOL has ever reached the
   vault to unwrap.
-- **The deployed binary has not been verified against source.** No reproducible
-  build was run, so whether the mainnet artifact matches any commit in this repo
-  is unknown.
 - No human other than the author has read this.
 
 ## The outage of 2026-08-17
