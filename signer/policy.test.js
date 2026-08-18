@@ -8,7 +8,7 @@ const {
   createSyncNativeInstruction,
 } = require("@solana/spl-token");
 const crypto = require("crypto");
-const { assertOnlyPumpcoTrade, PolicyError, ROUTER, WSOL } = require("./policy");
+const { assertOnlyPumpcoTrade, PolicyError, ROUTER, PUMP_AMM, PUMP_CURVE, WSOL } = require("./policy");
 const { parseIntent, IntentError } = require("./intent");
 
 const AGENT = new PublicKey("CLeRK5GLfvRN6QeTv9Wi3Ma76SDeTpQB8ZXuoEvpnS6d");
@@ -102,6 +102,49 @@ expectAllow("the real shape: budget, wrap, sync, trade, unwrap", () =>
     createSyncNativeInstruction(ownWsol, TOKEN_PROGRAM_ID),
     routerTrade(),
     createCloseAccountInstruction(ownWsol, AGENT, AGENT, [], TOKEN_PROGRAM_ID),
+  ], AGENT));
+
+const accumulatorInit = (program) =>
+  new TransactionInstruction({
+    programId: program,
+    keys: [{ pubkey: AGENT, isSigner: true, isWritable: true }],
+    data: disc("init_user_volume_accumulator"),
+  });
+
+console.log("\nthe bonding curve path, which the gate used to refuse outright:");
+
+expectAllow("a curve trade", () =>
+  assertOnlyPumpcoTrade([
+    ComputeBudgetProgram.setComputeUnitLimit({ units: 300_000 }),
+    routerTrade("buy"),
+  ], AGENT));
+
+expectAllow("the curve's volume accumulator init", () =>
+  assertOnlyPumpcoTrade([accumulatorInit(PUMP_CURVE), routerTrade("buy")], AGENT));
+
+expectAllow("the AMM's volume accumulator init", () =>
+  assertOnlyPumpcoTrade([accumulatorInit(PUMP_AMM), routerTrade("buy_amm")], AGENT));
+
+// Allowlisting the program must not allowlist its other instructions: a direct
+// buy would move the agent's money without ever passing the router's caps.
+expectReject("a direct curve buy, bypassing the router", () =>
+  assertOnlyPumpcoTrade([
+    new TransactionInstruction({
+      programId: PUMP_CURVE,
+      keys: [{ pubkey: AGENT, isSigner: true, isWritable: true }],
+      data: Buffer.concat([disc("buy"), Buffer.alloc(16)]),
+    }),
+    routerTrade("buy"),
+  ], AGENT));
+
+expectReject("a direct AMM sell, bypassing the router", () =>
+  assertOnlyPumpcoTrade([
+    new TransactionInstruction({
+      programId: PUMP_AMM,
+      keys: [{ pubkey: AGENT, isSigner: true, isWritable: true }],
+      data: Buffer.concat([disc("sell"), Buffer.alloc(16)]),
+    }),
+    routerTrade("buy_amm"),
   ], AGENT));
 
 console.log(`\n${pass} passed, ${fail} failed`);

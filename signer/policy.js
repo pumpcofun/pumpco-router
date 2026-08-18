@@ -18,6 +18,7 @@ const {
 
 const ROUTER = new PublicKey("PUMpCot6PDv4pda4a6Mwd3gDMyFCXpSLFej9ftskrxp");
 const PUMP_AMM = new PublicKey("pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA");
+const PUMP_CURVE = new PublicKey("6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P");
 const WSOL = new PublicKey("So11111111111111111111111111111111111111112");
 const COMPUTE_BUDGET = new PublicKey("ComputeBudget111111111111111111111111111111");
 const TOKEN_2022 = new PublicKey("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb");
@@ -60,11 +61,14 @@ function assertOnlyPumpcoTrade(instructions, signer) {
       continue;
     }
 
-    // Only ever to create the per-user volume accumulator a buy requires.
-    if (p.equals(PUMP_AMM)) {
+    // Only ever to create the per-user volume accumulator a buy requires. Both
+    // venues keep their own, so both programs appear here and neither may be
+    // called for anything else.
+    if (p.equals(PUMP_AMM) || p.equals(PUMP_CURVE)) {
       const disc = Buffer.from(ix.data.subarray(0, 8));
       if (!disc.equals(discriminator("init_user_volume_accumulator"))) {
-        throw new PolicyError(`${at}: direct AMM call that is not accumulator init`);
+        const venue = p.equals(PUMP_AMM) ? "AMM" : "curve";
+        throw new PolicyError(`${at}: direct ${venue} call that is not accumulator init`);
       }
       continue;
     }
@@ -109,4 +113,4 @@ function assertOnlyPumpcoTrade(instructions, signer) {
   }
 }
 
-module.exports = { assertOnlyPumpcoTrade, PolicyError, ROUTER, PUMP_AMM, WSOL };
+module.exports = { assertOnlyPumpcoTrade, PolicyError, ROUTER, PUMP_AMM, PUMP_CURVE, WSOL };
