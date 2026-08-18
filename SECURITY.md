@@ -44,6 +44,11 @@ Two further limits on what this program can promise:
 - **`set_agent` does not read `authority_managed`.** The authority can change any
   agent's ceiling, disable it, or grant it a reward share, including a wallet that
   registered itself. The flag only stops a wallet raising its own ceiling.
+- **Disabling an agent does not remove its reward share.** `set_agent` keeps
+  `config.total_reward_bps` consistent by subtracting the old value and adding the
+  new one, so a disabled agent whose `reward_bps` is still set continues to be
+  demanded in every `distribute_rewards` payee list. To take an agent out of
+  rewards, set its `reward_bps` to zero; disabling alone is not enough.
 
 ## Verified against source
 
@@ -95,8 +100,12 @@ reason about the economics and does not substitute for a human reading the code.
   with its own seeds. Re-deriving here would add code that can be wrong without
   adding a guarantee.
 - **`rewards.rs` moves lamports by direct adjustment** rather than a System CPI.
-  The vault is owned by this program, so this is the normal pattern, but it is
-  the sharpest edge in the codebase and deserves the closest read.
+  This is not merely convenient, it is required: the System Program refuses to
+  transfer from an account that carries data, and the vault is a data-bearing
+  PDA this program owns. The related trap is `UnbalancedInstruction`, which fires
+  if lamports are adjusted by hand and a CPI follows in the same instruction
+  without those accounts included. The fee is taken after the venue CPI returns,
+  so it does not arise here, and six mainnet trades confirm it.
 - **The fee is always taken in native SOL**, on both venues, so the vault holds
   one asset. On the AMM this means the size is measured from the WSOL account
   while the fee is paid from the agent's lamports.
@@ -137,11 +146,25 @@ against its 5000 bps share, remainder to the treasury, leaving the vault rent
 exempt. This is the mechanism the token's funding depends on, and it is no longer
 theoretical.
 
+**An outsider can use the router, and pays for it.** A wallet the authority has
+never touched called `self_register`, and the program did the three things it is
+supposed to do differently for a stranger: clamped the 10 SOL/day it asked for
+down to the 0.5 ceiling, set its fee to the config rate rather than a discount,
+and left `config.total_reward_bps` untouched so it earns no share of creator
+rewards. It then traded both legs and paid exactly 1.0000% each way. Because it
+is not `authority_managed`, it could also lower its own ceiling, which the clerk
+cannot.
+
+| | |
+|---|---|
+| outsider buy | `jEhV9fXoe5FY5EUdxDXKiKojdfWZZLk5m2sDiwFrr4SNv9ggPvjuc77drvfqPXBc27mhGF9Bb6Ch836wXrnhjNn` |
+| outsider sell | `5PiwqTM57zHW7kkjxvxubsMC6YocdYLW6aRfrkWzqzLG6szR6YwMJiP7pGCVbyVREK4MXqMtdwp8WjB5y3vZxyc2` |
+
 **The kill switch works.** With `paused` true, a valid buy fails at `amm.rs:30`
 with `Paused`; it unpaused cleanly.
 
-**Thirteen guards were attacked directly on the deployed program** and all
-refused, seven on the trading path and six on the admin path. Simulation, so free:
+**Fourteen guards were attacked directly on the deployed program** and all
+refused, eight on the trading path and six on the admin path. Simulation, so free:
 `scripts/guards-mainnet.js` and `admin-mainnet.js guards`.
 
 | Attack | Refused with |
@@ -159,14 +182,12 @@ refused, seven on the trading path and six on the admin path. Simulation, so fre
 | agent fee above the 3% ceiling | `FeeTooHigh` |
 | reward share above 100% | `RewardSharesTooHigh` |
 | distribute naming no agents | `IncompletePayees` |
+| buy inside the per-trade cap but past the daily budget | `DailyLimitExceeded` |
 
 `set_authority` was exercised as a no-op rotation to the same key.
 
 ## Not proven
 
-- **No outsider has ever used the router.** `self_register` has not been called
-  on mainnet, so the path by which someone other than us registers a wallet and
-  pays the config fee rate is unexercised.
 - **No real creator fee has ever been paid to the vault.** The reward path was
   proven with wrapped SOL we staged there ourselves. Nothing has yet arrived from
   pump.fun, because no token names the vault.

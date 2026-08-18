@@ -159,7 +159,11 @@ async function readPool(pool) {
   // 6. zero size
   await sim("zero amount", accounts(), buyData(0, 0), "ZeroAmount|TradeTooLarge");
 
-  // 7. a config that is not the real one
+  // 7. the daily budget, which binds below the per-trade cap once spent
+  await sim("buy inside the per-trade cap but past the daily budget",
+    accounts(), buyData(1, 0.01 * LAMPORTS_PER_SOL), "DailyLimitExceeded");
+
+  // 8. a config that is not the real one
   const k7 = accounts();
   k7[0] = m(Keypair.generate().publicKey);
   await sim("substituted config account", k7, buyData(1, 1000), "ConstraintSeeds|AccountNotInitialized|AccountOwnedByWrongProgram");
