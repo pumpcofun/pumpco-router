@@ -16,7 +16,7 @@ const {
   TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID, getAssociatedTokenAddressSync,
 } = require("@solana/spl-token");
 
-const ROUTER = new PublicKey("pumpcoEZJNNneH9KjrpBSVCKpADVgJpBbtkGvbtFbuy");
+const ROUTER = new PublicKey("PUMpCot6PDv4pda4a6Mwd3gDMyFCXpSLFej9ftskrxp");
 const PUMP_AMM = new PublicKey("pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA");
 const WSOL = new PublicKey("So11111111111111111111111111111111111111112");
 const COMPUTE_BUDGET = new PublicKey("ComputeBudget111111111111111111111111111111");

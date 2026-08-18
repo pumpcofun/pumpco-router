@@ -17,7 +17,6 @@ use anchor_lang::prelude::*;
 pub mod amm;
 pub mod curve;
 pub mod guards;
-pub mod migrate;
 pub mod rewards;
 pub mod state;
 
@@ -48,7 +47,7 @@ security_txt! {
     auditors: "None"
 }
 
-declare_id!("pumpcoEZJNNneH9KjrpBSVCKpADVgJpBbtkGvbtFbuy");
+declare_id!("PUMpCot6PDv4pda4a6Mwd3gDMyFCXpSLFej9ftskrxp");
 
 #[program]
 pub mod pumpco_router {
@@ -91,26 +90,6 @@ pub mod pumpco_router {
     pub fn set_authority(ctx: Context<SetAuthority>) -> Result<()> {
         ctx.accounts.config.authority = ctx.accounts.new_authority.key();
         Ok(())
-    }
-
-    /// Grows the on-chain Config and agent records to their current layout.
-    /// Both gained a field after they had already been written, and nothing
-    /// else in this program can run until this has been called.
-    ///
-    /// The reward total is supplied rather than recomputed: the program cannot
-    /// enumerate its own agents, so only the authority knows the real sum.
-    ///
-    /// Send each account its extra rent in the same transaction, ahead of this
-    /// instruction. Config needs 8 more bytes and an agent 2.
-    pub fn migrate(ctx: Context<Migrate>, total_reward_bps: u64, fee_bps: u16) -> Result<()> {
-        migrate::run(
-            &ctx.accounts.config.to_account_info(),
-            &ctx.accounts.agent_auth.to_account_info(),
-            &ctx.accounts.authority.to_account_info(),
-            ctx.program_id,
-            total_reward_bps,
-            fee_bps,
-        )
     }
 
     /// Creates the address to hand pump.fun as `creator` at token launch.
@@ -619,19 +598,3 @@ pub struct UnwrapCreatorFees<'info> {
     pub token_program: UncheckedAccount<'info>,
 }
 
-#[derive(Accounts)]
-pub struct Migrate<'info> {
-    /// CHECK: still the old length, so it cannot be deserialized. The handler
-    /// checks the discriminator and the authority the record names by hand.
-    #[account(mut, seeds = [b"config"], bump)]
-    pub config: UncheckedAccount<'info>,
-
-    /// CHECK: only used to derive the agent seed.
-    pub wallet: UncheckedAccount<'info>,
-
-    /// CHECK: still the old length. Its seed pins it to `wallet`.
-    #[account(mut, seeds = [b"agent", wallet.key().as_ref()], bump)]
-    pub agent_auth: UncheckedAccount<'info>,
-
-    pub authority: Signer<'info>,
-}

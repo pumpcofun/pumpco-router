@@ -20,5 +20,5 @@ exec solana-test-validator --reset --quiet \
   --clone 8Wf5TiAheLUqBrKXeYg2JtAFFMWtKdG2BSFgqUcPVwTt \
   --maybe-clone BdJ7Nc4G2vxr7R1QgMJq3Frg4BdG27MDfFuzAB7jVc6o \
   --maybe-clone A7hAgCzFw14fejgCp387JUJRMNyz4j89JKnhtKU8piqW \
-  --bpf-program pumpcoEZJNNneH9KjrpBSVCKpADVgJpBbtkGvbtFbuy \
+  --bpf-program PUMpCot6PDv4pda4a6Mwd3gDMyFCXpSLFej9ftskrxp \
     "${PROGRAM_SO:-./target/deploy/pumpco_router.so}"

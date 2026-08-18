@@ -6,7 +6,7 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-pumpco_router = "pumpcoEZJNNneH9KjrpBSVCKpADVgJpBbtkGvbtFbuy"
+pumpco_router = "PUMpCot6PDv4pda4a6Mwd3gDMyFCXpSLFej9ftskrxp"
 
 [registry]
 url = "https://api.apr.dev"

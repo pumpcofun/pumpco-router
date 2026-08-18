@@ -14,7 +14,7 @@ const PUMP_PROGRAM = new PublicKey("6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
 const PUMP_AMM_PROGRAM = new PublicKey("pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA");
 const FEE_PROGRAM = new PublicKey("pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ");
 const WSOL = new PublicKey("So11111111111111111111111111111111111111112");
-const ROUTER = new PublicKey("pumpcoEZJNNneH9KjrpBSVCKpADVgJpBbtkGvbtFbuy");
+const ROUTER = new PublicKey("PUMpCot6PDv4pda4a6Mwd3gDMyFCXpSLFej9ftskrxp");
 
 /** Anchor account sizes below these need an `extend_account` before trading. */
 const BONDING_CURVE_MIN_SIZE = 150;

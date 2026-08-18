@@ -11,7 +11,7 @@ const crypto = require("crypto");
 const fs = require("fs");
 
 const RPC = "http://127.0.0.1:8899";
-const ROUTER = new PublicKey("pumpcoEZJNNneH9KjrpBSVCKpADVgJpBbtkGvbtFbuy");
+const ROUTER = new PublicKey("PUMpCot6PDv4pda4a6Mwd3gDMyFCXpSLFej9ftskrxp");
 
 const disc = (n) => crypto.createHash("sha256").update(`global:${n}`).digest().subarray(0, 8);
 const u64 = (n) => { const b = Buffer.alloc(8); b.writeBigUInt64LE(BigInt(n)); return b; };

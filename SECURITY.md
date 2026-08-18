@@ -47,28 +47,28 @@ Two further limits on what this program can promise:
 
 ## Verified against source
 
-The deployed binary is a reproducible build of commit `09a5f60`, confirmed by
-OtterSec's remote verifier as well as locally.
+The deployed binary is a reproducible build of this commit.
 
 | | |
 |---|---|
-| Program hash | `55ea548749fa7ce8440049e7803c6a9805324db84aecf4dd6a095cb0cbf77929` |
-| Status | https://verify.osec.io/status/pumpcoEZJNNneH9KjrpBSVCKpADVgJpBbtkGvbtFbuy |
+| Program | `PUMpCot6PDv4pda4a6Mwd3gDMyFCXpSLFej9ftskrxp` |
+| Program hash | `e69386c77ac659e40286049142b3f78a937c6257f9dff9e853c80b7444ae8274` |
+| Status | https://verify.osec.io/status/PUMpCot6PDv4pda4a6Mwd3gDMyFCXpSLFej9ftskrxp |
 
-To reproduce, which needs Docker and nothing from this machine:
+To reproduce, which needs Docker and nothing from the author's machine:
 
 ```
 solana-verify build --library-name pumpco_router   -b solanafoundation/solana-verifiable-build:4.0.3
-solana-verify get-program-hash -u <rpc> pumpcoEZJNNneH9KjrpBSVCKpADVgJpBbtkGvbtFbuy
+solana-verify get-program-hash -u <rpc> PUMpCot6PDv4pda4a6Mwd3gDMyFCXpSLFej9ftskrxp
 ```
 
-The image tag matters. Older images ship a cargo that cannot parse the
-`edition2024` manifests in the dependency tree, and every image produces a
-binary about 29 KB larger than a local `cargo build-sbf`, which is why the
-program account had to be extended before this could be deployed.
+The image tag matters. Images older than 3.1.x ship a cargo that cannot parse the
+`edition2024` manifests in the dependency tree, and every image produces a binary
+roughly 27 KB larger than a local `cargo build-sbf`, so the program account must
+be sized for the reproducible build rather than the local one.
 
-This proves the bytes on chain are the source in this repo. It says nothing
-about whether the source is correct.
+This proves the bytes on chain are the source in this repo. It says nothing about
+whether the source is correct.
 
 ## Static analysis
 
@@ -112,17 +112,24 @@ reason about the economics and does not substitute for a human reading the code.
 
 ## Proven on mainnet
 
-As of 2026-08-17, eight transactions have touched the program: the deploy, then
-`initialize`, `init_creator_vault` and `register_agent`, then two PumpSwap
-trades, then two admin and rewards exercises.
+**Nothing yet, on this deployment.** The program was redeployed on 2026-08-18
+under a new id from a fresh deploy wallet, and so far it has only set itself up:
+deploy, `initialize`, `init_creator_vault`, `register_agent`. No trade has run
+through this binary on mainnet.
+
+What was proven, and on what:
 
 - **The PumpSwap path works end to end with real money, both legs.** A buy and a
-  sell of a third party's token, run by hand from `scripts/trade-mainnet.js`. The
-  router took exactly 1.000% on each into the configured fee vault.
-- The program is deployed on mainnet and devnet. Only mainnet was ever
-  initialized, so **devnet is a shell**: no Config, no creator vault, no agent.
-  A client pointed there fails on the first instruction that loads Config, which
-  makes devnet useless as a rehearsal without initializing it first.
+  sell of a third party's token, run by hand. The router took exactly 1.000% on
+  each into the configured fee vault. That was the **previous** deployment, whose
+  source differs from this one only by the removal of a one-shot migration
+  instruction that a fresh program cannot use.
+- **Both venues, and every guard, pass against the real pump.fun and PumpSwap
+  programs on a validator forked from mainnet.** That is the strongest evidence
+  that applies to this exact source.
+
+Treat the mainnet trading path as unproven on this program until a real trade
+lands. The clerk holds no SOL, so nothing can trade yet regardless.
 
 ## Not proven
 
@@ -137,7 +144,7 @@ trades, then two admin and rewards exercises.
   vault to unwrap.
 - No human other than the author has read this.
 
-## The outage of 2026-08-17
+## The outage of 2026-08-17, on the previous deployment
 
 `Config` and `AgentAuth` each gained a field, both inserted mid-struct rather
 than appended. The accounts on mainnet predated the change, so the upgraded

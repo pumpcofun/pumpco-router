@@ -23,7 +23,7 @@ const fs = require("fs");
 const RPC = "http://127.0.0.1:8899";
 const pk = (s) => new PublicKey(s);
 
-const ROUTER = pk("pumpcoEZJNNneH9KjrpBSVCKpADVgJpBbtkGvbtFbuy");
+const ROUTER = pk("PUMpCot6PDv4pda4a6Mwd3gDMyFCXpSLFej9ftskrxp");
 const AMM = pk("pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA");
 const FEE_PROGRAM = pk("pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ");
 const WSOL = pk("So11111111111111111111111111111111111111112");

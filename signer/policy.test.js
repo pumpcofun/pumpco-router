@@ -11,7 +11,7 @@ const crypto = require("crypto");
 const { assertOnlyPumpcoTrade, PolicyError, ROUTER, WSOL } = require("./policy");
 const { parseIntent, IntentError } = require("./intent");
 
-const AGENT = new PublicKey("AYxrFQzbcwZxPUiTq7uxmKSj9vbxEf27fpgAvgh2yUbv");
+const AGENT = new PublicKey("CLeRK5GLfvRN6QeTv9Wi3Ma76SDeTpQB8ZXuoEvpnS6d");
 const ATTACKER = new PublicKey("HN7cABqLq46Es1jh92dQQisAq662SmxELLLsHHe4YWrH");
 const MINT = new PublicKey("3eY3fYwqwrLxFWqvw8xiurre6qg7U5YmvDanS3Lj1VoT");
 const ownWsol = getAssociatedTokenAddressSync(WSOL, AGENT, true, TOKEN_PROGRAM_ID);

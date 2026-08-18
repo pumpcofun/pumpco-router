@@ -23,11 +23,11 @@ const RPC = process.env.SOLANA_RPC_URL;
 const pk = (s) => new PublicKey(s);
 const f = (v) => (Array.isArray(v) ? v[0] : v);
 
-const ROUTER = pk("pumpcoEZJNNneH9KjrpBSVCKpADVgJpBbtkGvbtFbuy");
+const ROUTER = pk("PUMpCot6PDv4pda4a6Mwd3gDMyFCXpSLFej9ftskrxp");
 const AMM = pk("pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA");
 const FEE_PROGRAM = pk("pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ");
 const WSOL = pk("So11111111111111111111111111111111111111112");
-const FEE_VAULT = pk("AiQ1omzndapTLihh3xKKFvJzmycHAX6CN6r2YUuynRgA");
+const FEE_VAULT = pk("AyxFYhVncAVRM6fHQsoQUyJmUCRtNAuk5UnzVm6anB4x");
 const GLOBAL_CONFIG = pk("ADyA8hdefvWN2dbGGWFotbzWxrAvLW83WG6QCVXvJKqw");
 const AMM_EVENT_AUTHORITY = pk("GS4CU59F31iL7aR2Q8zVS8DRrcRnXX1yjQ66TqNVQnaR");
 const AMM_FEE_CONFIG = pk("5PHirr8joyTMp9JMm6nW7hNDVyEYdkzDqazxPD7RaTjx");

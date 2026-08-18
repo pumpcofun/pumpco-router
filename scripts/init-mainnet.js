@@ -9,10 +9,10 @@ const crypto = require("crypto");
 const fs = require("fs");
 
 const RPC = process.env.RPC || "https://api.mainnet-beta.solana.com";
-const ROUTER = new PublicKey("pumpcoEZJNNneH9KjrpBSVCKpADVgJpBbtkGvbtFbuy");
-const FEE_VAULT = new PublicKey("AiQ1omzndapTLihh3xKKFvJzmycHAX6CN6r2YUuynRgA");
+const ROUTER = new PublicKey("PUMpCot6PDv4pda4a6Mwd3gDMyFCXpSLFej9ftskrxp");
+const FEE_VAULT = new PublicKey("AyxFYhVncAVRM6fHQsoQUyJmUCRtNAuk5UnzVm6anB4x");
 const TREASURY = FEE_VAULT;
-const CLERK = new PublicKey("AYxrFQzbcwZxPUiTq7uxmKSj9vbxEf27fpgAvgh2yUbv");
+const CLERK = new PublicKey("CLeRK5GLfvRN6QeTv9Wi3Ma76SDeTpQB8ZXuoEvpnS6d");
 
 // Agreed values. All changeable later with update_config / set_agent.
 const FEE_BPS = 100;                                   // 1%
@@ -20,6 +20,10 @@ const MAX_PER_TRADE = 0.05 * LAMPORTS_PER_SOL;         // one bad decision
 const DEFAULT_DAILY = 0.5 * LAMPORTS_PER_SOL;          // ceiling for self-registration
 const CLERK_DAILY = 0.4 * LAMPORTS_PER_SOL;            // one bad day
 const CLERK_REWARD_BPS = 5000;                         // half of creator rewards
+// Our own machine, so billing it is circular: the fee would move from the clerk
+// to a vault we also own, while costing the clerk 2% of every round trip it has
+// to earn back. Outsiders still inherit the 1% in config.
+const CLERK_FEE_BPS = 0;
 
 const disc = (n) => crypto.createHash("sha256").update(`global:${n}`).digest().subarray(0, 8);
 const u64 = (n) => { const b = Buffer.alloc(8); b.writeBigUInt64LE(BigInt(n)); return b; };
@@ -68,9 +72,11 @@ async function main() {
       account: agentAuth,
       ix: new TransactionInstruction({
         programId: ROUTER,
-        keys: [m(config), m(authority.publicKey, true, true), m(CLERK),
+        // config is writable: registering an agent adds to its total_reward_bps.
+        keys: [m(config, false, true), m(authority.publicKey, true, true), m(CLERK),
                m(agentAuth, false, true), m(SystemProgram.programId)],
-        data: Buffer.concat([disc("register_agent"), u64(CLERK_DAILY), u16(CLERK_REWARD_BPS)]),
+        data: Buffer.concat([disc("register_agent"), u64(CLERK_DAILY),
+                             u16(CLERK_REWARD_BPS), u16(CLERK_FEE_BPS)]),
       }),
     },
   ];
