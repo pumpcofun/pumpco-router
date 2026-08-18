@@ -16,6 +16,7 @@ const {
 } = require("@solana/web3.js");
 const fs = require("fs");
 const { buildTrade } = require("../client/trade");
+const { readLimits, maxBuy } = require("../client/sizing");
 const { assertOnlyPumpcoTrade } = require("../signer/policy");
 
 (async () => {
@@ -28,16 +29,19 @@ const { assertOnlyPumpcoTrade } = require("../signer/policy");
   const agent = Keypair.fromSecretKey(Uint8Array.from(
     JSON.parse(fs.readFileSync(process.env.CLERK_KEY, "utf8"))));
 
-  const { prep, trade, meta } = await buildTrade({
-    connection, agent: agent.publicKey, mint, side, sol,
-  });
-
   console.log("agent   :", agent.publicKey.toBase58());
   console.log("mint    :", mint.toBase58());
-  console.log("venue   :", meta.venue);
   console.log("side    :", side, side === "buy" ? `${sol} SOL` : "(whole position)");
   const before = await connection.getBalance(agent.publicKey);
   console.log("balance :", (before / LAMPORTS_PER_SOL).toFixed(9), "SOL");
+  const limits = await readLimits(connection, agent.publicKey);
+  console.log("allowed :", (Number(maxBuy(limits)) / LAMPORTS_PER_SOL).toFixed(9),
+    "SOL  (smallest of the chain cap, a share of balance, and today's budget)");
+
+  const { prep, trade, meta } = await buildTrade({
+    connection, agent: agent.publicKey, mint, side, sol,
+  });
+  console.log("venue   :", meta.venue);
 
   // The gate assumes the builder is wrong and checks anyway. Setup is exempt
   // because it carries no trade, and is built by code the model cannot reach.

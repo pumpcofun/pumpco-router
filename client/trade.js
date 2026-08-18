@@ -33,6 +33,7 @@ const {
   PUMP_PROGRAM, PUMP_AMM_PROGRAM, FEE_PROGRAM, WSOL, ROUTER, routerPdas,
   resolveVenue, first,
 } = require("./venue");
+const { readLimits, assertWithinBudget, maxBuy } = require("./sizing");
 
 const pk = (s) => new PublicKey(s);
 
@@ -267,14 +268,23 @@ async function feeVault(connection) {
  *                     graduated pool. A fresh curve wants 500 to 1500: too
  *                     tight and the trade simply fails, which on an exit means
  *                     a stop-loss that never fires.
+ * @param sizing       overrides for the balance-relative ceilings in sizing.js.
+ *                     A buy is refused before it is built if it breaches them.
+ *                     Sells are never refused here: the chain does not bound
+ *                     them either, and blocking an exit is the worse failure.
  */
-async function buildTrade({ connection, agent, mint, side, sol = 0, slippageBps = 100 }) {
+async function buildTrade({ connection, agent, mint, side, sol = 0, slippageBps = 100, sizing = {} }) {
   if (!Number.isInteger(slippageBps) || slippageBps < 0 || slippageBps >= 10_000) {
     throw new Error(`slippageBps out of range: ${slippageBps}`);
   }
   if (side !== "buy" && side !== "sell") throw new Error(`unknown side ${side}`);
   const lamports = BigInt(Math.floor(sol * 1e9));
   if (side === "buy" && lamports <= 0n) throw new Error("a buy needs a positive size");
+
+  if (side === "buy") {
+    const limits = await readLimits(connection, agent);
+    assertWithinBudget(limits, lamports, sizing);
+  }
 
   const v = await resolveVenue(connection, mint);
   if (v.needsExtend) {

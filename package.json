@@ -7,7 +7,7 @@
     "test": "tests"
   },
   "scripts": {
-    "test": "node signer/policy.test.js",
+    "test": "node signer/policy.test.js && node client/sizing.test.js",
     "guards": "node scripts/guards-mainnet.js",
     "test:local": "node tests/admin-and-rewards.js",
     "test:forked": "node tests/forked-buy.js && node tests/forked-amm.js"
