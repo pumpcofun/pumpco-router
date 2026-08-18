@@ -112,43 +112,64 @@ reason about the economics and does not substitute for a human reading the code.
 
 ## Proven on mainnet
 
-The PumpSwap path works end to end on this deployment, with real money, both legs.
-A buy and a sell of a third party's token (ANSEM, chosen for a $2.4M pool where
-0.05 SOL moves nothing), routed by the clerk through the router:
+All of this ran against the deployed binary, on mainnet, with real money.
+
+**Both venues, both legs.** PumpSwap and the bonding curve each completed a buy
+and a sell routed by the clerk. `TradeRouted` fired on all four and decodes with
+the site's own `extractTrades`, with `onAmm` correctly distinguishing the venue.
 
 | | |
 |---|---|
-| buy | `64e1QiULJ2KMVJwsLanQeVzrt5b5b5dz35jx7qvQ3UdChWKLr4TzWphtF2nBki2pW7n9aukTDfdNrCh3TzDjVdKg` |
-| sell | `2zG2J7Z4symQp2NSpfNxhEPzyvK7P7KpDbdyWLV2SwQEFWoEGY7xRJTWSYmvXDE4zAu1wD9aEfpXbdb5HvKYrh1` |
+| AMM buy | `64e1QiULJ2KMVJwsLanQeVzrt5b5b5dz35jx7qvQ3UdChWKLr4TzWphtF2nBki2pW7n9aukTDfdNrCh3TzDjVdKg` |
+| AMM sell | `2zG2J7Z4symQp2NSpfNxhEPzyvK7P7KpDbdyWLV2SwQEFWoEGY7xRJTWSYmvXDE4zAu1wD9aEfpXbdb5HvKYrh1` |
+| curve buy | `inGdjanKhvVcsX5fqWjprr4aFfw2rE6QNhjmaN6HQ5dW8XbfkGMRvN4bYZRcU3fpt2jW74K8u9RArFYhxXiFar5` |
+| curve sell | `32aecmidNc4BwfQqppmcp2e4idpMPppoobDWuwmRV45bKtGjsyEL3AzeCabjV7U8mAJrnH6UwJTp5dAk9ri1qZKU` |
 
-The CPI chain is what it should be: `BuyAmm` then PumpSwap's `Buy`, `SellAmm`
-then PumpSwap's `Sell`. `TradeRouted` fired on both and decodes with the site's
-own `extractTrades`, which is what the books page reads.
+**The fee is real and exact.** With the clerk temporarily set to 100 bps, a buy
+and a sell each moved exactly 1.0000% into the fee vault, measured from the event
+rather than inferred. The clerk was returned to 0 afterwards.
 
-The router took **zero** fee on each, which is correct: the clerk is registered at
-`fee_bps` 0. That is the configuration being exercised, not the fee path. **A
-non-zero router fee has never been taken on this deployment.**
+**The creator reward path works end to end**, staged before any token names the
+vault: wrapped SOL parked in the vault's token account exactly as pump.fun pays
+it after graduation, then `unwrap_creator_fees` converted it to lamports and
+closed the account, then `distribute_rewards` split it **50.00%** to the clerk
+against its 5000 bps share, remainder to the treasury, leaving the vault rent
+exempt. This is the mechanism the token's funding depends on, and it is no longer
+theoretical.
 
-Round trip cost 0.000042 SOL on 0.010030 SOL deployed, about 0.42%, which is
-pump.fun's own fee on a mature pool plus spread.
+**The kill switch works.** With `paused` true, a valid buy fails at `amm.rs:30`
+with `Paused`; it unpaused cleanly.
 
-- **Both venues, and every guard, also pass against the real pump.fun and
-  PumpSwap programs on a validator forked from mainnet.**
+**Thirteen guards were attacked directly on the deployed program** and all
+refused, seven on the trading path and six on the admin path. Simulation, so free:
+`scripts/guards-mainnet.js` and `admin-mainnet.js guards`.
+
+| Attack | Refused with |
+|---|---|
+| buy above the per-trade cap | `TradeTooLarge` |
+| fee redirected to another vault | `WrongFeeVault` |
+| CPI target swapped to the curve program | `WrongProgram` |
+| CPI target swapped to the token program | `WrongProgram` |
+| spending another agent's budget | `ConstraintSeeds` |
+| zero size | `ZeroAmount` |
+| substituted config account | `ConstraintSeeds` |
+| an agent raising its own ceiling | `AuthorityManaged` |
+| an outsider calling `update_config` | `Unauthorized` |
+| config fee above the 3% ceiling | `FeeTooHigh` |
+| agent fee above the 3% ceiling | `FeeTooHigh` |
+| reward share above 100% | `RewardSharesTooHigh` |
+| distribute naming no agents | `IncompletePayees` |
+
+`set_authority` was exercised as a no-op rotation to the same key.
 
 ## Not proven
 
-- **The bonding curve path has never run on mainnet.** It was exercised only
-  against a forked validator.
-- **The fee path has never run on mainnet on this deployment.** Both trades were
-  the clerk, at `fee_bps` 0. Registering an outsider at the config rate is what
-  would exercise it.
-- **Creator reward distribution has only run on a local validator.**
-  `distribute_rewards` has never moved a creator fee on mainnet, because no token
-  names the creator PDA, so the vault holds exactly its rent and the instruction
-  aborts with `NothingToDistribute`.
-- **`unwrap_creator_fees` has never run on mainnet.** It is covered locally, but
-  no token names the creator PDA yet, so no wrapped SOL has ever reached the
-  vault to unwrap.
+- **No outsider has ever used the router.** `self_register` has not been called
+  on mainnet, so the path by which someone other than us registers a wallet and
+  pays the config fee rate is unexercised.
+- **No real creator fee has ever been paid to the vault.** The reward path was
+  proven with wrapped SOL we staged there ourselves. Nothing has yet arrived from
+  pump.fun, because no token names the vault.
 - No human other than the author has read this.
 
 ## The outage of 2026-08-17, on the previous deployment
