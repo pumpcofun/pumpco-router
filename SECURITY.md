@@ -112,29 +112,36 @@ reason about the economics and does not substitute for a human reading the code.
 
 ## Proven on mainnet
 
-**Nothing yet, on this deployment.** The program was redeployed on 2026-08-18
-under a new id from a fresh deploy wallet, and so far it has only set itself up:
-deploy, `initialize`, `init_creator_vault`, `register_agent`. No trade has run
-through this binary on mainnet.
+The PumpSwap path works end to end on this deployment, with real money, both legs.
+A buy and a sell of a third party's token (ANSEM, chosen for a $2.4M pool where
+0.05 SOL moves nothing), routed by the clerk through the router:
 
-What was proven, and on what:
+| | |
+|---|---|
+| buy | `64e1QiULJ2KMVJwsLanQeVzrt5b5b5dz35jx7qvQ3UdChWKLr4TzWphtF2nBki2pW7n9aukTDfdNrCh3TzDjVdKg` |
+| sell | `2zG2J7Z4symQp2NSpfNxhEPzyvK7P7KpDbdyWLV2SwQEFWoEGY7xRJTWSYmvXDE4zAu1wD9aEfpXbdb5HvKYrh1` |
 
-- **The PumpSwap path works end to end with real money, both legs.** A buy and a
-  sell of a third party's token, run by hand. The router took exactly 1.000% on
-  each into the configured fee vault. That was the **previous** deployment, whose
-  source differs from this one only by the removal of a one-shot migration
-  instruction that a fresh program cannot use.
-- **Both venues, and every guard, pass against the real pump.fun and PumpSwap
-  programs on a validator forked from mainnet.** That is the strongest evidence
-  that applies to this exact source.
+The CPI chain is what it should be: `BuyAmm` then PumpSwap's `Buy`, `SellAmm`
+then PumpSwap's `Sell`. `TradeRouted` fired on both and decodes with the site's
+own `extractTrades`, which is what the books page reads.
 
-Treat the mainnet trading path as unproven on this program until a real trade
-lands. The clerk holds no SOL, so nothing can trade yet regardless.
+The router took **zero** fee on each, which is correct: the clerk is registered at
+`fee_bps` 0. That is the configuration being exercised, not the fee path. **A
+non-zero router fee has never been taken on this deployment.**
+
+Round trip cost 0.000042 SOL on 0.010030 SOL deployed, about 0.42%, which is
+pump.fun's own fee on a mature pool plus spread.
+
+- **Both venues, and every guard, also pass against the real pump.fun and
+  PumpSwap programs on a validator forked from mainnet.**
 
 ## Not proven
 
 - **The bonding curve path has never run on mainnet.** It was exercised only
   against a forked validator.
+- **The fee path has never run on mainnet on this deployment.** Both trades were
+  the clerk, at `fee_bps` 0. Registering an outsider at the config rate is what
+  would exercise it.
 - **Creator reward distribution has only run on a local validator.**
   `distribute_rewards` has never moved a creator fee on mainnet, because no token
   names the creator PDA, so the vault holds exactly its rent and the instruction

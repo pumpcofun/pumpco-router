@@ -158,27 +158,47 @@ async function main() {
   // what fails is putting it anywhere other than first.
   const sellTrailing = [m(poolV2), m(buyback), m(buybackAta, false, true)];
 
-  const ixs = [
-    ComputeBudgetProgram.setComputeUnitLimit({ units: 300_000 }),
-    ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 300_000 }),
-  ];
-
-  // pump.fun needs the per-user accumulator to exist before a buy.
+  // Setup rides in its own transaction. With both ATA creates and the
+  // accumulator inline, a buy comes to 1237 bytes against a 1232 limit.
+  const prep = [];
   if (!(await connection.getAccountInfo(userVol))) {
-    ixs.push(new TransactionInstruction({
+    prep.push(new TransactionInstruction({
       programId: AMM,
       keys: [m(clerk.publicKey, true, true), m(clerk.publicKey), m(userVol, false, true),
              m(SystemProgram.programId), m(AMM_EVENT_AUTHORITY), m(AMM)],
       data: disc("init_user_volume_accumulator"),
     }));
   }
+  if (side === "buy" && !(await connection.getAccountInfo(userBase))) {
+    prep.push(createAssociatedTokenAccountIdempotentInstruction(
+      clerk.publicKey, userBase, clerk.publicKey, mint, baseProgram));
+  }
+  if (!(await connection.getAccountInfo(userQuote))) {
+    prep.push(createAssociatedTokenAccountIdempotentInstruction(
+      clerk.publicKey, userQuote, clerk.publicKey, WSOL, TOKEN_PROGRAM_ID));
+  }
+  if (prep.length) {
+    if (!doSend) {
+      console.log(`
+setup       : ${prep.length} instruction(s) needed first; rerun with --send`);
+      return;
+    }
+    const ptx = new Transaction().add(
+      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 300_000 }), ...prep);
+    const psig = await sendAndConfirmTransaction(connection, ptx, [clerk], { commitment: "confirmed" });
+    console.log("setup       :", psig);
+  }
+
+  const ixs = [
+    ComputeBudgetProgram.setComputeUnitLimit({ units: 300_000 }),
+    ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 300_000 }),
+  ];
 
   if (side === "sell") {
     const held = BigInt((await rpc("getTokenAccountBalance", [userBase.toBase58()])).value.amount);
     if (held === 0n) throw new Error("nothing held to sell");
     console.log("selling     :", (Number(held) / 1e6).toFixed(6), "tokens");
     ixs.push(
-      createAssociatedTokenAccountIdempotentInstruction(clerk.publicKey, userQuote, clerk.publicKey, WSOL, TOKEN_PROGRAM_ID),
       new TransactionInstruction({
         programId: ROUTER,
         keys: accounts.slice(0, 26).concat(sellTrailing),
@@ -188,8 +208,6 @@ async function main() {
     );
   } else {
   ixs.push(
-    createAssociatedTokenAccountIdempotentInstruction(clerk.publicKey, userBase, clerk.publicKey, mint, baseProgram),
-    createAssociatedTokenAccountIdempotentInstruction(clerk.publicKey, userQuote, clerk.publicKey, WSOL, TOKEN_PROGRAM_ID),
     SystemProgram.transfer({ fromPubkey: clerk.publicKey, toPubkey: userQuote, lamports: spend }),
     createSyncNativeInstruction(userQuote, TOKEN_PROGRAM_ID),
     new TransactionInstruction({
